@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Health Assessment Prototype</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',sans-serif;background:#e2e8f0;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;padding:32px 16px 64px}
+.scene{display:flex;flex-direction:column;align-items:center;gap:16px}
+.label-top{font-size:12px;color:#94a3b8;letter-spacing:0.5px;text-transform:uppercase}
+
+/* iPhone shell */
+.phone{width:390px;height:844px;background:#fff;border-radius:54px;border:10px solid #1c1c1e;position:relative;overflow:hidden;display:flex;flex-direction:column;flex-shrink:0}
+.phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:32px;background:#1c1c1e;border-radius:0 0 20px 20px;z-index:20}
+.phone::after{content:'';position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:130px;height:5px;background:#1c1c1e;border-radius:3px;z-index:20}
+
+/* Status bar */
+.sbar{display:flex;justify-content:space-between;align-items:center;padding:14px 28px 0;height:50px;flex-shrink:0;z-index:5}
+.sbar-time{font-size:15px;font-weight:600;color:#1c1c1e;letter-spacing:-0.3px}
+.sbar-r{display:flex;align-items:center;gap:5px}
+
+/* Screen container */
+.screens{flex:1;position:relative;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:#fff;transition:transform 0.38s cubic-bezier(.4,0,.2,1),opacity 0.38s ease;will-change:transform,opacity}
+.screen.hidden-right{transform:translateX(100%);opacity:0;pointer-events:none}
+.screen.hidden-left{transform:translateX(-100%);opacity:0;pointer-events:none}
+.screen.active{transform:translateX(0);opacity:1}
+
+/* Progress bar */
+.progress-wrap{padding:0 24px;margin-top:6px;flex-shrink:0}
+.progress-track{height:3px;background:#f0f0f5;border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:#3a8eea;border-radius:2px;transition:width 0.5s ease}
+.step-label{font-size:11px;color:#aaa;margin-bottom:5px;letter-spacing:0.2px}
+
+/* Scrollable body */
+.scroll-body{flex:1;overflow-y:auto;padding:20px 24px 12px;-webkit-overflow-scrolling:touch}
+.scroll-body::-webkit-scrollbar{display:none}
+
+/* Question screens */
+.q-icon{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;margin-bottom:18px}
+.q-title{font-size:22px;font-weight:700;color:#1a2a4a;line-height:1.25;letter-spacing:-0.4px;margin-bottom:8px}
+.q-sub{font-size:14px;color:#8a94a6;line-height:1.5;margin-bottom:24px}
+
+/* Option cards */
+.option-card{display:flex;align-items:center;gap:14px;padding:16px 18px;border:1.5px solid #e8ecf4;border-radius:16px;margin-bottom:10px;cursor:pointer;transition:all 0.18s ease;background:#fff;-webkit-tap-highlight-color:transparent}
+.option-card:hover{border-color:#3a8eea;background:#f5f9ff}
+.option-card.selected{border-color:#3a8eea;background:#eef5ff}
+.option-card.selected .oc-radio{background:#3a8eea;border-color:#3a8eea}
+.option-card.selected .oc-radio::after{opacity:1}
+.oc-radio{width:22px;height:22px;border-radius:50%;border:2px solid #d1d9e6;flex-shrink:0;position:relative;transition:all 0.15s}
+.oc-radio::after{content:'';position:absolute;inset:4px;border-radius:50%;background:#fff;opacity:0;transition:opacity 0.15s}
+.oc-body{flex:1}
+.oc-label{font-size:15px;font-weight:500;color:#1a2a4a;line-height:1.3}
+.oc-desc{font-size:12px;color:#8a94a6;margin-top:2px;line-height:1.4}
+.oc-icon{font-size:24px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:12px;flex-shrink:0}
+
+/* Multi-select chips */
+.chips-wrap{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:8px}
+.chip{padding:10px 16px;border:1.5px solid #e8ecf4;border-radius:24px;font-size:13px;font-weight:500;color:#3a4a6a;cursor:pointer;transition:all 0.15s;background:#fff;-webkit-tap-highlight-color:transparent}
+.chip:hover{border-color:#3a8eea;color:#3a8eea}
+.chip.sel{background:#eef5ff;border-color:#3a8eea;color:#1a5db5}
+.chip .ck{display:inline-block;margin-right:4px;opacity:0;transition:opacity 0.15s}
+.chip.sel .ck{opacity:1}
+
+/* Bottom action area */
+.bottom-area{padding:12px 24px 28px;flex-shrink:0;background:#fff}
+.btn-main{width:100%;padding:16px;background:#3a8eea;color:#fff;border:none;border-radius:30px;font-size:16px;font-weight:600;cursor:pointer;letter-spacing:-0.2px;transition:all 0.15s;font-family:inherit}
+.btn-main:hover{background:#2a7dd8}
+.btn-main:active{transform:scale(0.98)}
+.btn-main:disabled{background:#b0c8e8;cursor:default}
+.btn-ghost{width:100%;padding:14px;background:#fff;color:#3a8eea;border:1.5px solid #3a8eea;border-radius:30px;font-size:15px;font-weight:600;cursor:pointer;margin-top:10px;font-family:inherit;transition:all 0.15s}
+.btn-ghost:hover{background:#f0f7ff}
+
+/* Back button */
+.back-btn{display:flex;align-items:center;gap:6px;font-size:15px;color:#3a8eea;font-weight:500;cursor:pointer;padding:0 24px;margin-top:4px;margin-bottom:2px;flex-shrink:0;height:32px}
+.back-arrow{font-size:18px;line-height:1}
+
+/* Sankey / report screen */
+.report-header{padding:16px 24px 12px;flex-shrink:0}
+.report-title{font-size:20px;font-weight:700;color:#1a2a4a;letter-spacing:-0.3px}
+.report-sub{font-size:13px;color:#8a94a6;margin-top:3px}
+.sankey-wrap{padding:0 16px;flex-shrink:0}
+.sankey-svg{width:100%;display:block}
+.risk-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 24px;margin-top:12px}
+.risk-card{padding:14px;border-radius:14px;border:1px solid #e8ecf4}
+.rc-label{font-size:11px;color:#8a94a6;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px}
+.rc-val{font-size:20px;font-weight:700;letter-spacing:-0.5px}
+.rc-bar{height:4px;border-radius:2px;margin-top:8px}
+.risk-tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px}
+.findings-section{padding:12px 24px 0}
+.fs-title{font-size:13px;font-weight:600;color:#1a2a4a;margin-bottom:8px}
+.finding-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #f5f7fa}
+.finding-row:last-child{border-bottom:none}
+.fr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.fr-text{font-size:13px;color:#3a4a6a;line-height:1.4}
+.fr-pct{font-size:12px;font-weight:600;margin-left:auto;flex-shrink:0}
+
+/* Payment screen */
+.pay-hero{padding:28px 24px 16px;text-align:center;flex-shrink:0}
+.pay-icon-wrap{width:72px;height:72px;background:#eef5ff;border-radius:22px;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
+.pay-title{font-size:22px;font-weight:700;color:#1a2a4a;letter-spacing:-0.4px;margin-bottom:8px}
+.pay-sub{font-size:14px;color:#8a94a6;line-height:1.55}
+.pay-features{padding:0 24px;margin-bottom:4px}
+.pf-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f5f7fa}
+.pf-row:last-child{border-bottom:none}
+.pf-icon{width:34px;height:34px;border-radius:10px;background:#f0f7ff;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pf-label{font-size:14px;font-weight:500;color:#1a2a4a}
+.pf-desc{font-size:12px;color:#8a94a6;margin-top:1px}
+.price-badge{background:#1a2a4a;color:#fff;border-radius:20px;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;margin:0 24px 4px}
+.pb-label{font-size:14px;font-weight:500;color:#a0aec0}
+.pb-price{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+.pb-note{font-size:11px;color:#4a7a9e;margin-top:1px;text-align:right}
+
+/* Success screen */
+.success-wrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
+.success-circle{width:80px;height:80px;border-radius:50%;background:#e6f9f0;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+.success-title{font-size:22px;font-weight:700;color:#1a2a4a;margin-bottom:10px}
+.success-sub{font-size:14px;color:#8a94a6;line-height:1.6}
+
+/* Intro screen */
+.intro-illus{flex:0 0 320px;background:#f5f8ff;position:relative;overflow:hidden}
+.intro-content{flex:1;padding:20px 24px 28px;display:flex;flex-direction:column;justify-content:space-between}
+.intro-title{font-size:26px;font-weight:700;color:#1a2a4a;letter-spacing:-0.5px;margin-bottom:8px}
+.intro-sub{font-size:15px;color:#7a8699;line-height:1.55}
+.intro-dots{display:flex;gap:6px;margin:14px 0 18px}
+.intro-dot{width:8px;height:8px;border-radius:50%;background:#d1d9e8}
+.intro-dot.on{background:#3a8eea}
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="label-top">Health Assessment — Research Prototype</div>
+  <div class="phone" id="phone">
+
+    <!-- Status bar -->
+    <div class="sbar">
+      <span class="sbar-time" id="clock">18:22</span>
+      <div class="sbar-r">
+        <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="4" width="3" height="8" rx="1" fill="#1c1c1e"/><rect x="4.5" y="2.5" width="3" height="9.5" rx="1" fill="#1c1c1e"/><rect x="9" y="0.5" width="3" height="11.5" rx="1" fill="#1c1c1e"/><rect x="13.5" y="0.5" width="3" height="11.5" rx="1" fill="#d1d1d6"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 3C5.2 3 2.7 4.3 1 6.3L2.4 7.6C3.7 6 5.7 5 8 5s4.3 1 5.6 2.6L15 6.3C13.3 4.3 10.8 3 8 3z" fill="#1c1c1e"/><path d="M8 6.5c-1.7 0-3.2.7-4.3 1.8L5 9.6C5.8 8.6 6.8 8 8 8s2.2.6 3 1.6l1.3-1.3C11.2 7.2 9.7 6.5 8 6.5z" fill="#1c1c1e"/><circle cx="8" cy="11" r="1.5" fill="#1c1c1e"/></svg>
+        <svg width="27" height="13" viewBox="0 0 27 13"><rect x="0.5" y="0.5" width="22" height="12" rx="3" fill="none" stroke="#1c1c1e" stroke-width="1"/><rect x="23" y="4" width="3.5" height="5" rx="1.5" fill="#1c1c1e" opacity="0.4"/><rect x="2" y="2" width="18" height="9" rx="2" fill="#1c1c1e"/></svg>
+      </div>
+    </div>
+
+    <!-- Screen container -->
+    <div class="screens" id="screens">
+
+      <!-- SCREEN 0: Intro -->
+      <div class="screen active" id="sc0">
+        <div class="intro-illus">
+          <svg viewBox="0 0 390 320" style="position:absolute;inset:0;width:100%;height:100%">
+            <ellipse cx="195" cy="200" rx="200" ry="130" fill="#dce9f8" opacity="0.5"/>
+            <ellipse cx="90" cy="180" rx="70" ry="80" fill="#c8daf2" opacity="0.35"/>
+            <rect x="110" y="60" width="170" height="210" rx="18" fill="#1a2a5e" opacity="0.9"/>
+            <rect x="126" y="82" width="90" height="9" rx="4" fill="#3a8eea" opacity="0.6"/>
+            <rect x="126" y="98" width="130" height="7" rx="3" fill="#5a9ae8" opacity="0.3"/>
+            <rect x="126" y="112" width="110" height="7" rx="3" fill="#5a9ae8" opacity="0.22"/>
+            <rect x="126" y="134" width="138" height="1" rx="1" fill="#3a5a9e" opacity="0.3"/>
+            <rect x="126" y="148" width="55" height="20" rx="5" fill="#3a8eea" opacity="0.7"/>
+            <rect x="188" y="148" width="55" height="20" rx="5" fill="#2a5a8e" opacity="0.5"/>
+            <rect x="126" y="178" width="138" height="7" rx="3" fill="#3a5a9e" opacity="0.18"/>
+            <rect x="126" y="192" width="100" height="7" rx="3" fill="#3a5a9e" opacity="0.13"/>
+            <rect x="126" y="222" width="138" height="28" rx="8" fill="#3a8eea"/>
+            <rect x="200" y="55" width="56" height="40" rx="10" fill="#1abf8a"/>
+            <path d="M218 75 l6 6 12-12" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="130" cy="52" r="5" fill="#3a8eea" opacity="0.6"/>
+            <circle cx="292" cy="185" r="7" fill="#1abf8a" opacity="0.5"/>
+            <circle cx="305" cy="95" r="4" fill="#e87a50" opacity="0.7"/>
+            <path d="M82 130 l8-8 8 8" stroke="#3a8eea" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+          </svg>
+        </div>
+        <div class="intro-content">
+          <div>
+            <div class="intro-title">Check your symptoms</div>
+            <div class="intro-sub">Answer a few questions and get a personalised AI-powered diagnostic report in minutes.</div>
+            <div class="intro-dots">
+              <div class="intro-dot on"></div>
+              <div class="intro-dot"></div>
+              <div class="intro-dot"></div>
+              <div class="intro-dot"></div>
+            </div>
+          </div>
+          <div>
+            <button class="btn-main" onclick="goTo(1)">Get started</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SCREEN 1: Primary symptom / disease selection -->
+      <div class="screen hidden-right" id="sc1">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 1 of 7</div><div class="progress-track"><div class="progress-fill" style="width:14%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#eef5ff">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><circle cx="13" cy="13" r="11" stroke="#3a8eea" stroke-width="2"/><path d="M13 8v5l3 3" stroke="#3a8eea" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="q-title">What is your main symptom?</div>
+          <div class="q-sub">Select the condition that best matches what you're experiencing most.</div>
+          <div id="disease-options">
+            <div class="option-card" onclick="selectDisease(0,this)">
+              
+              <div class="oc-body"><div class="oc-label">Flu / Upper respiratory</div><div class="oc-desc">Fever, cough, sore throat, fatigue</div></div>
+              <div class="oc-radio"></div>
+            </div>
+            <div class="option-card" onclick="selectDisease(1,this)">
+              
+              <div class="oc-body"><div class="oc-label">Cardiovascular concern</div><div class="oc-desc">Chest pain, palpitations, breathlessness</div></div>
+              <div class="oc-radio"></div>
+            </div>
+            <div class="option-card" onclick="selectDisease(2,this)">
+              
+              <div class="oc-body"><div class="oc-label">Diabetes / Metabolic</div><div class="oc-desc">Thirst, frequent urination, fatigue</div></div>
+              <div class="oc-radio"></div>
+            </div>
+            <div class="option-card" onclick="selectDisease(3,this)">
+              
+              <div class="oc-body"><div class="oc-label">Neurological</div><div class="oc-desc">Headache, dizziness, memory issues</div></div>
+              <div class="oc-radio"></div>
+            </div>
+            <div class="option-card" onclick="selectDisease(4,this)">
+              
+              <div class="oc-body"><div class="oc-label">Musculoskeletal</div><div class="oc-desc">Joint pain, stiffness, swelling</div></div>
+              <div class="oc-radio"></div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" id="btn1" onclick="goTo(2)" disabled>Continue</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 2: Family history -->
+      <div class="screen hidden-right" id="sc2">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 2 of 7</div><div class="progress-track"><div class="progress-fill" style="width:28%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#fff0f5">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 4c-2.5 0-4.5 2-4.5 4.5S10.5 13 13 13s4.5-2 4.5-4.5S15.5 4 13 4z" stroke="#e85a8a" stroke-width="2"/><path d="M5 22c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke="#e85a8a" stroke-width="2" stroke-linecap="round"/><circle cx="6" cy="10" r="2.5" stroke="#e85a8a" stroke-width="1.5"/><circle cx="20" cy="10" r="2.5" stroke="#e85a8a" stroke-width="1.5"/></svg>
+          </div>
+          <div class="q-title">Family medical history</div>
+          <div class="q-sub">Select any conditions that run in your immediate family (parents, siblings).</div>
+          <div class="chips-wrap" id="chips-family">
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Diabetes</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>High blood pressure</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Heart disease</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Stroke</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Cancer</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Asthma</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Mental health conditions</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>None of the above</div>
+          </div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="goTo(3)">Continue</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 3: Lifestyle risk factors -->
+      <div class="screen hidden-right" id="sc3">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 3 of 7</div><div class="progress-track"><div class="progress-fill" style="width:42%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#f0fff8">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 3C7.5 3 3 7.5 3 13s4.5 10 10 10 10-4.5 10-10S18.5 3 13 3z" stroke="#1abf8a" stroke-width="2"/><path d="M9 13l3 3 5-5" stroke="#1abf8a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="q-title">Lifestyle & risk factors</div>
+          <div class="q-sub">This helps us personalise your risk assessment accurately.</div>
+          <div id="lifestyle-options">
+            <div class="option-card" onclick="selectSingle(this,'life')">
+              <div class="oc-body"><div class="oc-label">Do you smoke or use tobacco?</div></div>
+              <div class="oc-radio"></div>
+            </div>
+          </div>
+          <div style="margin:4px 0 12px"><span style="font-size:12px;color:#aaa">Smoking status</span></div>
+          <div class="chips-wrap">
+            <div class="chip" onclick="toggleChip(this)" id="sm-current"><span class="ck">✓</span>Current smoker</div>
+            <div class="chip" onclick="toggleChip(this)" id="sm-former"><span class="ck">✓</span>Former smoker</div>
+            <div class="chip" onclick="toggleChip(this)" id="sm-never"><span class="ck">✓</span>Never smoked</div>
+          </div>
+          <div style="margin:12px 0 8px"><span style="font-size:12px;color:#aaa">Other lifestyle factors</span></div>
+          <div class="chips-wrap">
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Regular exercise</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>High-stress job</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Poor sleep</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>High alcohol intake</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Sedentary lifestyle</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Overweight / Obese</div>
+          </div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="goTo(4)">Continue</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 4: Extended symptoms (disease-specific) -->
+      <div class="screen hidden-right" id="sc4">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 4 of 7</div><div class="progress-track"><div class="progress-fill" style="width:57%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#eef5ff">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M13 3v10l6 3" stroke="#3a8eea" stroke-width="2" stroke-linecap="round"/><circle cx="13" cy="13" r="10" stroke="#3a8eea" stroke-width="2"/></svg>
+          </div>
+          <div class="q-title" id="sc4-title">Additional symptoms</div>
+          <div class="q-sub">Select all symptoms you have been experiencing in the last 7 days.</div>
+          <div class="chips-wrap" id="chips-symptoms"></div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="goTo(5)">Continue</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 5: Duration & severity -->
+      <div class="screen hidden-right" id="sc5">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 5 of 7</div><div class="progress-track"><div class="progress-fill" style="width:71%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#fff8ee">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><rect x="4" y="5" width="18" height="18" rx="4" stroke="#f0a030" stroke-width="2"/><path d="M8 3v4M18 3v4M4 11h18" stroke="#f0a030" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="q-title">Duration & severity</div>
+          <div class="q-sub">How long have you been experiencing these symptoms?</div>
+          <div style="margin-bottom:18px">
+            <div class="option-card" onclick="selectSingle(this,'dur')"><div class="oc-body"><div class="oc-label">Less than 3 days</div></div><div class="oc-radio"></div></div>
+            <div class="option-card" onclick="selectSingle(this,'dur')"><div class="oc-body"><div class="oc-label">3–7 days</div></div><div class="oc-radio"></div></div>
+            <div class="option-card" onclick="selectSingle(this,'dur')"><div class="oc-body"><div class="oc-label">1–2 weeks</div></div><div class="oc-radio"></div></div>
+            <div class="option-card" onclick="selectSingle(this,'dur')"><div class="oc-body"><div class="oc-label">More than 2 weeks</div></div><div class="oc-radio"></div></div>
+          </div>
+          <div class="q-sub" style="margin-bottom:12px">How would you rate your overall discomfort?</div>
+          <div style="padding:0 4px">
+            <input type="range" min="1" max="10" value="5" id="severity-slider" style="width:100%;margin-bottom:8px" oninput="document.getElementById('sev-val').textContent=this.value"/>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#aaa">
+              <span>Mild (1)</span><span style="font-size:15px;font-weight:600;color:#3a8eea" id="sev-val">5</span><span>Severe (10)</span>
+            </div>
+          </div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="goTo(6)">Continue</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 6: Medical history / medications -->
+      <div class="screen hidden-right" id="sc6">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div class="progress-wrap"><div class="step-label">Step 6 of 7</div><div class="progress-track"><div class="progress-fill" style="width:85%"></div></div></div>
+        <div class="scroll-body">
+          <div class="q-icon" style="background:#f5f0ff">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none"><rect x="9" y="3" width="8" height="5" rx="2" stroke="#7c5cbf" stroke-width="2"/><rect x="4" y="6" width="18" height="17" rx="4" stroke="#7c5cbf" stroke-width="2"/><path d="M9 13h8M13 10v6" stroke="#7c5cbf" stroke-width="2" stroke-linecap="round"/></svg>
+          </div>
+          <div class="q-title">Medical history</div>
+          <div class="q-sub">Do you have any existing diagnosed conditions?</div>
+          <div class="chips-wrap" style="margin-bottom:20px">
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Hypertension</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Type 2 diabetes</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Asthma / COPD</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Heart disease</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Depression / Anxiety</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>Thyroid disorder</div>
+            <div class="chip" onclick="toggleChip(this)"><span class="ck">✓</span>None</div>
+          </div>
+          <div class="q-sub" style="margin-bottom:12px">Are you currently taking any medications?</div>
+          <div>
+            <div class="option-card" onclick="selectSingle(this,'meds')"><div class="oc-body"><div class="oc-label">Yes, prescription medications</div></div><div class="oc-radio"></div></div>
+            <div class="option-card" onclick="selectSingle(this,'meds')"><div class="oc-body"><div class="oc-label">Over-the-counter only</div></div><div class="oc-radio"></div></div>
+            <div class="option-card" onclick="selectSingle(this,'meds')"><div class="oc-body"><div class="oc-label">No medications</div></div><div class="oc-radio"></div></div>
+          </div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="buildReport()">Generate my report</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 7: Sankey Diagnostic Report -->
+      <div class="screen hidden-right" id="sc7">
+        <div class="report-header">
+          <div class="report-title">Your diagnostic report</div>
+          <div class="report-sub">AI analysis based on your symptom profile</div>
+        </div>
+        <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch" class="scroll-body" style="padding-top:0">
+          <div class="sankey-wrap">
+            <svg class="sankey-svg" id="sankey-svg" viewBox="0 0 358 280" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="risk-cards" id="risk-cards"></div>
+          <div class="findings-section" id="findings-section">
+            <div class="fs-title">Key clinical findings</div>
+            <div id="findings-list"></div>
+          </div>
+          <div style="height:20px"></div>
+        </div>
+        <div class="bottom-area" style="padding-top:8px">
+          <button class="btn-main" onclick="goTo(8)">Download full report — $0.99</button>
+          <button onclick="goTo(9)" style="width:100%;margin-top:10px;padding:13px;background:transparent;color:#8a94a6;border:none;border-radius:30px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit">No thanks, I'm done</button>
+        </div>
+      </div>
+
+      <!-- SCREEN 8: Payment -->
+      <div class="screen hidden-right" id="sc8">
+        <div class="back-btn" onclick="goBack()"><span class="back-arrow">‹</span> Back</div>
+        <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+          <div class="pay-hero">
+            <div class="pay-icon-wrap">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="3" y="8" width="30" height="22" rx="5" stroke="#3a8eea" stroke-width="2"/><path d="M3 14h30" stroke="#3a8eea" stroke-width="2"/><rect x="8" y="20" width="8" height="4" rx="2" fill="#3a8eea"/></svg>
+            </div>
+            <div class="pay-title">Get your full report</div>
+            <div class="pay-sub">One-time payment. Instant download. No subscription required.</div>
+          </div>
+          <div class="pay-features">
+            <div class="pf-row">
+              <div class="pf-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M3 9l4 4 8-8" stroke="#3a8eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div><div class="pf-label">Full Sankey diagnostic map</div><div class="pf-desc">Symptom-to-condition probability pathways</div></div>
+            </div>
+            <div class="pf-row">
+              <div class="pf-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="#3a8eea" stroke-width="2"/><path d="M9 6v3l2 2" stroke="#3a8eea" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <div><div class="pf-label">Risk timeline analysis</div><div class="pf-desc">Projected progression over 6–12 months</div></div>
+            </div>
+            <div class="pf-row">
+              <div class="pf-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 14V8l5-5 5 5v6H4z" stroke="#3a8eea" stroke-width="2" stroke-linejoin="round"/><rect x="7" y="10" width="4" height="4" rx="1" stroke="#3a8eea" stroke-width="1.5"/></svg></div>
+              <div><div class="pf-label">Personalised action plan</div><div class="pf-desc">Next steps based on your profile</div></div>
+            </div>
+            <div class="pf-row">
+              <div class="pf-icon"><svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2v10M5 8l4 4 4-4" stroke="#3a8eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16h12" stroke="#3a8eea" stroke-width="2" stroke-linecap="round"/></svg></div>
+              <div><div class="pf-label">PDF download</div><div class="pf-desc">Share with your doctor or specialist</div></div>
+            </div>
+          </div>
+          <div style="height:16px"></div>
+          <div class="price-badge">
+            <div><div class="pb-label">One-time payment</div><div class="pb-price">$0.99</div></div>
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="2" y="8" width="24" height="17" rx="4" stroke="#4a8aae" stroke-width="1.5"/><path d="M2 13h24" stroke="#4a8aae" stroke-width="1.5"/><rect x="6" y="18" width="7" height="3" rx="1.5" fill="#4a8aae"/></svg>
+          </div>
+          <div style="height:16px"></div>
+        </div>
+        <div class="bottom-area">
+          <button class="btn-main" onclick="goTo(9)">Pay $0.99 &amp; Download report</button>
+          <div style="text-align:center;font-size:11px;color:#aaa;margin-top:10px">Secured by Apple Pay · No recurring charges</div>
+        </div>
+      </div>
+
+      <!-- SCREEN 9: Success -->
+      <div class="screen hidden-right" id="sc9">
+        <div style="flex:1;display:flex;flex-direction:column">
+          <div class="success-wrap">
+            <div class="success-circle">
+              <svg width="38" height="38" viewBox="0 0 38 38" fill="none"><path d="M9 19l7 7 13-13" stroke="#1abf8a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div style="font-size:26px;font-weight:700;color:#1a2a4a;margin-bottom:10px">Thank you</div>
+            <div style="font-size:14px;color:#8a94a6;line-height:1.6;margin-bottom:32px" id="end-sub">Your assessment is complete. We hope this was helpful.</div>
+          </div>
+          <div class="bottom-area">
+            <button class="btn-main" onclick="restart()">Start new assessment</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /screens -->
+  </div><!-- /phone -->
+</div>
+
+<script>
+var history_stack = [];
+var cur = 0;
+var selectedDisease = 0;
+
+var diseaseSymptoms = [
+  ['Runny nose','Nasal congestion','Body aches','Chills','Loss of appetite','Night sweats','Sneezing','Sore throat','Ear pain'],
+  ['Chest tightness','Shortness of breath','Swollen ankles','Irregular heartbeat','Dizziness','Fatigue on exertion','Cold sweats','Jaw pain'],
+  ['Increased thirst','Frequent urination','Blurred vision','Slow wound healing','Tingling in hands','Unexplained weight loss','Irritability','Dark skin patches'],
+  ['Migraine','Light sensitivity','Noise sensitivity','Brain fog','Numbness','Tingling limbs','Vision changes','Neck stiffness','Mood changes'],
+  ['Joint stiffness','Back pain','Muscle weakness','Swollen joints','Limited range of motion','Morning stiffness','Tenderness on touch','Clicking joints']
+];
+
+var diseaseNames = ['Flu / Respiratory','Cardiovascular','Diabetes / Metabolic','Neurological','Musculoskeletal'];
+
+var sankeyCols = [
+  {name:'Flu',pct:72,col:'#3a8eea',risk:'Moderate',finding:'Viral respiratory pattern detected'},
+  {name:'Common Cold',pct:18,col:'#5ab8d0',risk:'Low',finding:'Mild viral infection markers'},
+  {name:'Sinusitis',pct:7,col:'#8ad0e8',risk:'Low',finding:'Possible sinus involvement'},
+  {name:'Other',pct:3,col:'#b0d8ee',risk:'Low',finding:'Unlikely alternative causes'}
+];
+
+var cvCols = [
+  {name:'Hypertension',pct:58,col:'#e85a6a',risk:'High',finding:'Blood pressure risk factors present'},
+  {name:'Arrhythmia',pct:24,col:'#f0926a',risk:'Moderate',finding:'Irregular beat pattern noted'},
+  {name:'Angina',pct:12,col:'#f0b878',risk:'Moderate',finding:'Exertional chest discomfort'},
+  {name:'Other',pct:6,col:'#f5d8a0',risk:'Low',finding:'Monitor and follow up'}
+];
+
+var dbCols = [
+  {name:'Type 2 Diabetes',pct:65,col:'#1abf8a',risk:'High',finding:'Metabolic syndrome indicators'},
+  {name:'Pre-diabetes',pct:22,col:'#48d4a8',risk:'Moderate',finding:'Borderline glucose profile'},
+  {name:'Thyroid',pct:9,col:'#80e8c8',risk:'Low',finding:'Possible thyroid involvement'},
+  {name:'Other',pct:4,col:'#b0f0e0',risk:'Low',finding:'Lifestyle factors dominant'}
+];
+
+var neuroCols = [
+  {name:'Migraine',pct:60,col:'#7c5cbf',risk:'Moderate',finding:'Classic migraine profile'},
+  {name:'Tension headache',pct:25,col:'#a080d8',risk:'Low',finding:'Stress-related pattern'},
+  {name:'Hypertensive',pct:10,col:'#c4a8ee',risk:'Moderate',finding:'BP-related headache possible'},
+  {name:'Other',pct:5,col:'#e0d0f8',risk:'Low',finding:'Rare causes unlikely'}
+];
+
+var muskCols = [
+  {name:'Osteoarthritis',pct:55,col:'#e87830',risk:'Moderate',finding:'Degenerative joint changes'},
+  {name:'Rheumatoid',pct:28,col:'#f0a058',risk:'High',finding:'Inflammatory markers pattern'},
+  {name:'Fibromyalgia',pct:12,col:'#f8c888',risk:'Moderate',finding:'Widespread pain pattern'},
+  {name:'Other',pct:5,col:'#fce0b8',risk:'Low',finding:'Localised injury possible'}
+];
+
+var diseaseCols = [sankeyCols, cvCols, dbCols, neuroCols, muskCols];
+
+function updateClock(){
+  var d=new Date();
+  var h=d.getHours().toString().padStart(2,'0');
+  var m=d.getMinutes().toString().padStart(2,'0');
+  document.getElementById('clock').textContent=h+':'+m;
+}
+updateClock();setInterval(updateClock,15000);
+
+function goTo(n){
+  var old = document.getElementById('sc'+cur);
+  var next = document.getElementById('sc'+n);
+  history_stack.push(cur);
+  old.classList.remove('active');
+  old.classList.add('hidden-left');
+  next.classList.remove('hidden-right','hidden-left');
+  next.classList.add('active');
+  cur = n;
+  if(n===4) populateSymptoms();
+  if(n===9){
+    var paid=(histStack.indexOf(8)>-1)||(histStack[histStack.length-1]===8);
+    document.getElementById('end-sub').textContent=paid
+      ?'Your report is downloading. Share it with your doctor at your next appointment.'
+      :'Your assessment is complete. We hope this was helpful.';
+  }
+}
+
+function goBack(){
+  if(history_stack.length===0) return;
+  var prev = history_stack.pop();
+  var old = document.getElementById('sc'+cur);
+  var back = document.getElementById('sc'+prev);
+  old.classList.remove('active');
+  old.classList.add('hidden-right');
+  back.classList.remove('hidden-left','hidden-right');
+  back.classList.add('active');
+  cur = prev;
+}
+
+function selectDisease(idx, el){
+  selectedDisease = idx;
+  var cards = document.querySelectorAll('#disease-options .option-card');
+  cards.forEach(function(c){ c.classList.remove('selected'); });
+  el.classList.add('selected');
+  document.getElementById('btn1').disabled = false;
+}
+
+function selectSingle(el, group){
+  var parent = el.parentElement;
+  parent.querySelectorAll('.option-card').forEach(function(c){ c.classList.remove('selected'); });
+  el.classList.add('selected');
+}
+
+function toggleChip(el){
+  el.classList.toggle('sel');
+}
+
+function populateSymptoms(){
+  var title = diseaseNames[selectedDisease];
+  document.getElementById('sc4-title').textContent = title + ' — related symptoms';
+  var wrap = document.getElementById('chips-symptoms');
+  wrap.innerHTML = '';
+  var syms = diseaseSymptoms[selectedDisease];
+  syms.forEach(function(s){
+    var c = document.createElement('div');
+    c.className = 'chip';
+    c.onclick = function(){ toggleChip(this); };
+    c.innerHTML = '<span class="ck">✓</span>'+s;
+    wrap.appendChild(c);
+  });
+}
+
+function buildReport(){
+  goTo(7);
+  var cols = diseaseCols[selectedDisease];
+  drawSankey(cols);
+  buildRiskCards(cols);
+  buildFindings(cols);
+}
+
+function drawSankey(cols){
+  var svg = document.getElementById('sankey-svg');
+  svg.innerHTML = '';
+  var W = 358, H = 280;
+  var symW = 10, diagW = 90, pad = 28;
+  var leftX = 14, midX = 160, rightX = 248;
+  var symptoms = diseaseSymptoms[selectedDisease].slice(0,6);
+  var symCount = symptoms.length;
+  var symSpacing = (H-40) / (symCount-1);
+
+  var titleEl = document.createElementNS('http://www.w3.org/2000/svg','text');
+  titleEl.setAttribute('x','14'); titleEl.setAttribute('y','14');
+  titleEl.setAttribute('font-size','11'); titleEl.setAttribute('fill','#aaa');
+  titleEl.setAttribute('font-family','-apple-system,sans-serif');
+  titleEl.textContent = 'SYMPTOM FLOW → PROBABLE DIAGNOSIS';
+  svg.appendChild(titleEl);
+
+  var totalH = H - 40;
+  var diagHeights = cols.map(function(c){ return Math.max(18, c.pct/100*totalH); });
+  var startY = 28;
+  var diagYs = [];
+  var acc = startY;
+  cols.forEach(function(c,i){
+    diagYs.push(acc + diagHeights[i]/2);
+    acc += diagHeights[i] + 6;
+  });
+
+  cols.forEach(function(c,i){
+    var y0 = diagYs[i] - diagHeights[i]/2;
+    var rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', rightX); rect.setAttribute('y', y0);
+    rect.setAttribute('width', diagW); rect.setAttribute('height', diagHeights[i]);
+    rect.setAttribute('rx','4'); rect.setAttribute('fill', c.col);
+    svg.appendChild(rect);
+
+    var t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t1.setAttribute('x', rightX+6); t1.setAttribute('y', diagYs[i]-3);
+    t1.setAttribute('font-size','10'); t1.setAttribute('fill','#fff');
+    t1.setAttribute('font-weight','600'); t1.setAttribute('font-family','-apple-system,sans-serif');
+    t1.textContent = c.name;
+    svg.appendChild(t1);
+
+    var t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t2.setAttribute('x', rightX+6); t2.setAttribute('y', diagYs[i]+10);
+    t2.setAttribute('font-size','11'); t2.setAttribute('fill','rgba(255,255,255,0.85)');
+    t2.setAttribute('font-weight','700'); t2.setAttribute('font-family','-apple-system,sans-serif');
+    t2.textContent = c.pct+'%';
+    svg.appendChild(t2);
+  });
+
+  var midHalfW = 8;
+  symptoms.forEach(function(sym, si){
+    var sy = startY + si * symSpacing;
+
+    var srect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    srect.setAttribute('x', leftX); srect.setAttribute('y', sy-9);
+    srect.setAttribute('width','92'); srect.setAttribute('height','18');
+    srect.setAttribute('rx','9'); srect.setAttribute('fill','#f0f4fa');
+    svg.appendChild(srect);
+
+    var st = document.createElementNS('http://www.w3.org/2000/svg','text');
+    st.setAttribute('x', leftX+8); st.setAttribute('y', sy+4);
+    st.setAttribute('font-size','9.5'); st.setAttribute('fill','#3a4a6a');
+    st.setAttribute('font-family','-apple-system,sans-serif');
+    st.textContent = sym;
+    svg.appendChild(st);
+
+    cols.forEach(function(c,ci){
+      var weight = (ci===0) ? 0.6 : (ci===1) ? 0.25 : (ci===2) ? 0.1 : 0.05;
+      var dy = diagYs[ci];
+      var sw = Math.max(1, weight * 12);
+      var opac = 0.15 + weight * 0.5;
+
+      var path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      var x1 = leftX+92, x2 = rightX;
+      var cp1x = x1 + (x2-x1)*0.5, cp2x = x1 + (x2-x1)*0.5;
+      var d = 'M'+x1+' '+sy+' C'+cp1x+' '+sy+' '+cp2x+' '+dy+' '+x2+' '+dy;
+      path.setAttribute('d', d);
+      path.setAttribute('fill','none');
+      path.setAttribute('stroke', c.col);
+      path.setAttribute('stroke-width', sw);
+      path.setAttribute('opacity', opac);
+      svg.appendChild(path);
+    });
+  });
+}
+
+function buildRiskCards(cols){
+  var top = cols[0];
+  var html = '';
+  var riskColors = {'High':'#e85a6a','Moderate':'#f0a030','Low':'#1abf8a'};
+  var bgColors = {'High':'#fff0f2','Moderate':'#fff8ee','Low':'#f0fff8'};
+  html += '<div class="risk-card" style="background:'+bgColors[top.risk]+';border-color:'+top.col+'">';
+  html += '<div class="rc-label">Top diagnosis</div>';
+  html += '<div class="rc-val" style="color:'+top.col+'">'+top.pct+'%</div>';
+  html += '<div class="rc-bar" style="background:'+top.col+';width:'+top.pct+'%"></div>';
+  html += '<span class="risk-tag" style="background:'+riskColors[top.risk]+'22;color:'+riskColors[top.risk]+'">'+top.risk+' risk</span>';
+  html += '</div>';
+  html += '<div class="risk-card">';
+  html += '<div class="rc-label">Diagnosis</div>';
+  html += '<div class="rc-val" style="color:#1a2a4a;font-size:15px">'+top.name+'</div>';
+  html += '<div style="font-size:12px;color:#8a94a6;margin-top:6px">'+diseaseNames[selectedDisease]+'</div>';
+  html += '</div>';
+  document.getElementById('risk-cards').innerHTML = html;
+}
+
+function buildFindings(cols){
+  var dotColors = {'High':'#e85a6a','Moderate':'#f0a030','Low':'#1abf8a'};
+  var html = '';
+  cols.forEach(function(c){
+    var dc = dotColors[c.risk]||'#aaa';
+    html += '<div class="finding-row">';
+    html += '<div class="fr-dot" style="background:'+dc+'"></div>';
+    html += '<div class="fr-text">'+c.finding+'</div>';
+    html += '<span class="fr-pct" style="color:'+c.col+'">'+c.pct+'%</span>';
+    html += '</div>';
+  });
+  document.getElementById('findings-list').innerHTML = html;
+}
+
+function restart(){
+  var old = document.getElementById('sc'+cur);
+  old.classList.remove('active');
+  old.classList.add('hidden-right');
+  var home = document.getElementById('sc0');
+  home.classList.remove('hidden-left','hidden-right');
+  home.classList.add('active');
+  cur = 0;
+  history_stack = [];
+  selectedDisease = 0;
+  document.querySelectorAll('.option-card').forEach(function(c){ c.classList.remove('selected'); });
+  document.querySelectorAll('.chip').forEach(function(c){ c.classList.remove('sel'); });
+  document.getElementById('btn1').disabled = true;
+}
+</script>
+</body>
+</html>
